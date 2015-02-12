@@ -193,11 +193,11 @@ begin
                   if hit_tmp_0 = '1' then
                     addr <= "00" & addr_tmp_0(addr_width-1-2 downto 0);
                   elsif hit_tmp_1 = '1' then
-                    addr <= "01" & addr_tmp_0(addr_width-1-2 downto 0);
+                    addr <= "01" & addr_tmp_1(addr_width-1-2 downto 0);
                   elsif hit_tmp_2 = '1' then
-                    addr <= "10" & addr_tmp_0(addr_width-1-2 downto 0);
+                    addr <= "10" & addr_tmp_2(addr_width-1-2 downto 0);
                   elsif hit_tmp_3 = '1' then
-                    addr <= "11" & addr_tmp_0(addr_width-1-2 downto 0);
+                    addr <= "11" & addr_tmp_3(addr_width-1-2 downto 0);
                   end if;
                   state <= ERASE_STATE;
                   ack   <= '0';
