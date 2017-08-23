@@ -1,0 +1,374 @@
+diff -u -r test/single.orig/all_gather_scan.cu test/single/all_gather_scan.cu
+--- test/single.orig/all_gather_scan.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/all_gather_scan.cu	2017-08-23 11:45:11.573106561 +0900
+@@ -73,7 +73,7 @@
+   }
+ 
+   type = strToType(argv[1]);
+-  if (type == nccl_NUM_TYPES) {
++  if (type == ncclNumTypes) {
+     printf("Invalid <type> '%s'\n", argv[1]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+@@ -186,14 +186,20 @@
+     }
+ 
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+-      CUDACHECK(cudaSetDevice(list[g]));
+-      NCCLCHECK(ncclAllGather(input[g], n, type, output[g], comm[g], stream[g]));
++      //CUDACHECK(cudaSetDevice(list[g]));
++      NCCLCHECK(ncclAllGather(input[g], output[g], n, type, comm[g], stream[g]));
+     }
++    ncclGroupEnd();
++    
++    //    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       CUDACHECK(cudaStreamSynchronize(stream[g]));
+     }
++    //    ncclGroupEnd();
++    
+     auto stop = std::chrono::high_resolution_clock::now();
+     double ms = std::chrono::duration_cast<std::chrono::duration<double>>
+         (stop - start).count() * 1000.0;
+diff -u -r test/single.orig/all_gather_test.cu test/single/all_gather_test.cu
+--- test/single.orig/all_gather_test.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/all_gather_test.cu	2017-08-23 10:48:39.860677071 +0900
+@@ -41,11 +41,12 @@
+   }
+ 
+   // warm up GPU
++  ncclGroupStart();
+   for (int i = 0; i < nDev; ++i) {
+-    CUDACHECK(cudaSetDevice(dList[i]));
+-    NCCLCHECK(ncclAllGather((const void*)sendbuff[i], std::min(32 * 1024, N), type,
+-        (void*)recvbuff[i], comms[i], s[i]));
++    //CUDACHECK(cudaSetDevice(dList[i]));
++    NCCLCHECK(ncclAllGather((const void*)sendbuff[i], (void*)recvbuff[i], std::min(32 * 1024, N), type, comms[i], s[i]));
+   }
++  ncclGroupEnd();
+ 
+   for (int i = 0; i < nDev; ++i) {
+     CUDACHECK(cudaSetDevice(dList[i]));
+@@ -59,11 +60,12 @@
+ 
+     auto start = std::chrono::high_resolution_clock::now();
+ 
++    ncclGroupStart();
+     for (int i = 0; i < nDev; ++i) {
+-      CUDACHECK(cudaSetDevice(dList[i]));
+-      NCCLCHECK(ncclAllGather((const void*)sendbuff[i], n, type, (void*)recvbuff[i], comms[i],
+-          s[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
++      NCCLCHECK(ncclAllGather((const void*)sendbuff[i], (void*)recvbuff[i], n, type, comms[i], s[i]));
+     }
++    ncclGroupEnd();
+ 
+     for (int i = 0; i < nDev; ++i) {
+       CUDACHECK(cudaSetDevice(dList[i]));
+diff -u -r test/single.orig/all_reduce_scan.cu test/single/all_reduce_scan.cu
+--- test/single.orig/all_reduce_scan.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/all_reduce_scan.cu	2017-08-23 11:01:50.076705010 +0900
+@@ -75,14 +75,14 @@
+   }
+ 
+   type = strToType(argv[1]);
+-  if (type == nccl_NUM_TYPES) {
++  if (type == ncclNumTypes) {
+     printf("Invalid <type> '%s'\n", argv[1]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+   }
+ 
+   op = strToOp(argv[2]);
+-  if (op == nccl_NUM_OPS) {
++  if (op == ncclNumOps) {
+     printf("Invalid <op> '%s'\n", argv[2]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+@@ -197,10 +197,12 @@
+     }
+ 
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+-      CUDACHECK(cudaSetDevice(list[g]));
++      //CUDACHECK(cudaSetDevice(list[g]));
+       NCCLCHECK(ncclAllReduce(input[g], output[g], n, type, op, comm[g], stream[g]));
+     }
++    ncclGroupEnd();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       CUDACHECK(cudaStreamSynchronize(stream[g]));
+diff -u -r test/single.orig/all_reduce_test.cu test/single/all_reduce_test.cu
+--- test/single.orig/all_reduce_test.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/all_reduce_test.cu	2017-08-22 17:39:03.982213356 +0900
+@@ -46,10 +46,12 @@
+   }
+ 
+   // warm up GPU
++  ncclGroupStart();
+   for (int i = 0; i < nDev; ++i) {
+-    CUDACHECK(cudaSetDevice(dList[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
+     NCCLCHECK(ncclAllReduce((const void*)sendbuff[i], (void*)recvbuff[i], std::min(N, 1024 * 1024), type, op, comms[i], s[i]));
+   }
++  ncclGroupEnd();
+ 
+   for (int i = 0; i < nDev; ++i) {
+     CUDACHECK(cudaSetDevice(dList[i]));
+@@ -66,12 +68,14 @@
+     // do out-of-place reduction first
+     nvtxRangePushA("out of place");
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     //for (int i=0; i<100; i++) {
+       for (int i = 0; i < nDev; ++i) {
+-        CUDACHECK(cudaSetDevice(dList[i]));
++	  //CUDACHECK(cudaSetDevice(dList[i]));
+         NCCLCHECK(ncclAllReduce((const void*)sendbuff[i], (void*)recvbuff[i], n, type, op,
+             comms[i], s[i]));
+       }
++    ncclGroupEnd();
+     //}
+ 
+     for (int i = 0; i < nDev; ++i) {
+@@ -113,12 +117,14 @@
+     // now do in-place reduction
+     nvtxRangePushA("in place");
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     //for (int i=0; i<100; i++) {
+       for (int i = 0; i < nDev; ++i) {
+-        CUDACHECK(cudaSetDevice(dList[i]));
++	  //CUDACHECK(cudaSetDevice(dList[i]));
+         NCCLCHECK(ncclAllReduce((const void*)sendbuff[i], (void*)sendbuff[i], n, type, op,
+             comms[i], s[i]));
+       }
++    ncclGroupEnd();
+     //}
+ 
+     for (int i = 0; i < nDev; ++i) {
+diff -u -r test/single.orig/broadcast_scan.cu test/single/broadcast_scan.cu
+--- test/single.orig/broadcast_scan.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/broadcast_scan.cu	2017-08-23 10:56:04.294914659 +0900
+@@ -73,7 +73,7 @@
+   }
+ 
+   type = strToType(argv[1]);
+-  if (type == nccl_NUM_TYPES) {
++  if (type == ncclNumTypes) {
+     printf("Invalid <type> '%s'\n", argv[1]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+@@ -186,10 +186,12 @@
+     }
+ 
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+-      CUDACHECK(cudaSetDevice(list[g]));
++      //CUDACHECK(cudaSetDevice(list[g]));
+       NCCLCHECK(ncclBcast(io[g], n, type, 0, comm[g], stream[g]));
+     }
++    ncclGroupEnd();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       CUDACHECK(cudaStreamSynchronize(stream[g]));
+diff -u -r test/single.orig/broadcast_test.cu test/single/broadcast_test.cu
+--- test/single.orig/broadcast_test.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/broadcast_test.cu	2017-08-22 17:41:23.394823480 +0900
+@@ -45,10 +45,12 @@
+   }
+ 
+   // warm up GPU
++  ncclGroupStart();
+   for (int i = 0; i < nDev; ++i) {
+-    CUDACHECK(cudaSetDevice(dList[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
+     NCCLCHECK(ncclBcast((void*)buff[i], std::min(32 * 1024, N), type, root, comms[i], s[i]));
+   }
++  ncclGroupEnd();
+ 
+   for (int i = 0; i < nDev; ++i) {
+     CUDACHECK(cudaSetDevice(dList[i]));
+@@ -63,10 +65,12 @@
+ 
+     auto start = std::chrono::high_resolution_clock::now();
+ 
++    ncclGroupStart();
+     for (int i = 0; i < nDev; ++i) {
+-      CUDACHECK(cudaSetDevice(dList[i]));
++	//CUDACHECK(cudaSetDevice(dList[i]));
+       NCCLCHECK(ncclBcast((void*)buff[i], n, type, root, comms[i], s[i]));
+     }
++    ncclGroupEnd();
+ 
+     for (int i = 0; i < nDev; ++i) {
+       CUDACHECK(cudaSetDevice(dList[i]));
+diff -u -r test/single.orig/reduce_scan.cu test/single/reduce_scan.cu
+--- test/single.orig/reduce_scan.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/reduce_scan.cu	2017-08-23 10:57:10.259305321 +0900
+@@ -75,14 +75,14 @@
+   }
+ 
+   type = strToType(argv[1]);
+-  if (type == nccl_NUM_TYPES) {
++  if (type == ncclNumTypes) {
+     printf("Invalid <type> '%s'\n", argv[1]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+   }
+ 
+   op = strToOp(argv[2]);
+-  if (op == nccl_NUM_OPS) {
++  if (op == ncclNumOps) {
+     printf("Invalid <op> '%s'\n", argv[2]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+@@ -196,10 +196,12 @@
+       CUDACHECK(cudaStreamSynchronize(stream[0]));
+ 
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       NCCLCHECK(ncclReduce(input[g], output, n, type, op, 0, comm[g], stream[g]));
+     }
++    ncclGroupEnd();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       CUDACHECK(cudaStreamSynchronize(stream[g]));
+diff -u -r test/single.orig/reduce_scatter_scan.cu test/single/reduce_scatter_scan.cu
+--- test/single.orig/reduce_scatter_scan.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/reduce_scatter_scan.cu	2017-08-23 10:58:13.627655730 +0900
+@@ -75,14 +75,14 @@
+   }
+ 
+   type = strToType(argv[1]);
+-  if (type == nccl_NUM_TYPES) {
++  if (type == ncclNumTypes) {
+     printf("Invalid <type> '%s'\n", argv[1]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+   }
+ 
+   op = strToOp(argv[2]);
+-  if (op == nccl_NUM_OPS) {
++  if (op == ncclNumOps) {
+     printf("Invalid <op> '%s'\n", argv[2]);
+     showUsage(argv[0]);
+     exit(EXIT_FAILURE);
+@@ -198,10 +198,12 @@
+     }
+ 
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     for(int g=0; g<gpus; ++g) {
+-      CUDACHECK(cudaSetDevice(list[g]));
++      //CUDACHECK(cudaSetDevice(list[g]));
+       NCCLCHECK(ncclReduceScatter(input[g], output[g], n, type, op, comm[g], stream[g]));
+     }
++    ncclGroupEnd();
+     for(int g=0; g<gpus; ++g) {
+       CUDACHECK(cudaSetDevice(list[g]));
+       CUDACHECK(cudaStreamSynchronize(stream[g]));
+diff -u -r test/single.orig/reduce_scatter_test.cu test/single/reduce_scatter_test.cu
+--- test/single.orig/reduce_scatter_test.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/reduce_scatter_test.cu	2017-08-23 10:57:44.735498794 +0900
+@@ -46,11 +46,13 @@
+   }
+ 
+   // warm up GPU
++  ncclGroupStart();
+   for (int i = 0; i < nDev; ++i) {
+-    CUDACHECK(cudaSetDevice(dList[i]));
++    //CUDACHECK(cudaSetDevice(dList[i]));
+     NCCLCHECK(ncclReduceScatter((const void*)sendbuff[i], (void*)recvbuff[i],
+         std::min(N, 1024 * 1024), type, op, comms[i], s[i]));
+   }
++  ncclGroupEnd();
+ 
+   for (int i = 0; i < nDev; ++i) {
+     CUDACHECK(cudaSetDevice(dList[i]));
+@@ -66,11 +68,13 @@
+     // do out-of-place reduction first
+     auto start = std::chrono::high_resolution_clock::now();
+ 
++    ncclGroupStart();
+     for (int i = 0; i < nDev; ++i) {
+-      CUDACHECK(cudaSetDevice(dList[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
+       NCCLCHECK(ncclReduceScatter((const void*)sendbuff[i], (void*)recvbuff[i], n, type,
+           op, comms[i], s[i]));
+     }
++    ncclGroupEnd();
+ 
+     for (int i = 0; i < nDev; ++i) {
+       CUDACHECK(cudaSetDevice(dList[i]));
+@@ -106,11 +110,13 @@
+ 
+     auto start = std::chrono::high_resolution_clock::now();
+ 
++    ncclGroupStart();
+     for (int i = 0; i < nDev; ++i) {
+-      CUDACHECK(cudaSetDevice(dList[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
+       NCCLCHECK(ncclReduceScatter((const void*)sendbuff[i], (void*)sendbuff[i], n, type,
+           op, comms[i], s[i]));
+     }
++    ncclGroupEnd();
+ 
+     for (int i = 0; i < nDev; ++i) {
+       CUDACHECK(cudaSetDevice(dList[i]));
+diff -u -r test/single.orig/reduce_test.cu test/single/reduce_test.cu
+--- test/single.orig/reduce_test.cu	2017-08-23 12:03:20.369398713 +0900
++++ test/single/reduce_test.cu	2017-08-22 17:46:56.080215317 +0900
+@@ -48,11 +48,13 @@
+   }
+ 
+   // warm up GPU
++  ncclGroupStart();
+   for (int i = 0; i < nDev; ++i) {
+-    CUDACHECK(cudaSetDevice(dList[i]));
++      //CUDACHECK(cudaSetDevice(dList[i]));
+     NCCLCHECK(ncclReduce((const void*)sendbuff[i], (void*)recvbuff[i], std::min(N, 1024 * 1024),
+         type, op, root, comms[i], s[i]));
+   }
++  ncclGroupEnd();
+ 
+   for (int i = 0; i < nDev; ++i) {
+     CUDACHECK(cudaSetDevice(dList[i]));
+@@ -69,12 +71,14 @@
+     // do out-of-place reduction first
+     nvtxRangePushA("out of place");
+     auto start = std::chrono::high_resolution_clock::now();
++    ncclGroupStart();
+     //for (int i=0; i<100; i++) {
+       for (int i = 0; i < nDev; ++i) {
+-        CUDACHECK(cudaSetDevice(dList[i]));
++	  //CUDACHECK(cudaSetDevice(dList[i]));
+         NCCLCHECK(ncclReduce((const void*)sendbuff[i], (void*)recvbuff[i], n, type, op,
+             root, comms[i], s[i]));
+       }
++    ncclGroupEnd();
+     //}
+ 
+     for (int i = 0; i < nDev; ++i) {
+@@ -113,11 +117,13 @@
+     nvtxRangePushA("in place");
+     auto start = std::chrono::high_resolution_clock::now();
+     //for (int i=0; i<100; i++) {
++    ncclGroupStart();
+       for (int i = 0; i < nDev; ++i) {
+-        CUDACHECK(cudaSetDevice(dList[i]));
++	  //CUDACHECK(cudaSetDevice(dList[i]));
+         NCCLCHECK(ncclReduce((const void*)sendbuff[i], (void*)sendbuff[i], n, type, op,
+             root, comms[i], s[i]));
+       }
++    ncclGroupEnd();
+     //}
+ 
+     for (int i = 0; i < nDev; ++i) {

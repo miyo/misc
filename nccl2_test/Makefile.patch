@@ -1,0 +1,123 @@
+--- Makefile.orig	2017-08-23 12:00:51.696175673 +0900
++++ Makefile	2017-08-23 09:50:55.936310412 +0900
+@@ -52,10 +52,10 @@
+ CXXFLAGS += -DPROFAPI
+ endif
+ 
+-NCCL_MAJOR   := 1
+-NCCL_MINOR   := 3
+-NCCL_PATCH   := 5
+-CXXFLAGS  += -DNCCL_MAJOR=$(NCCL_MAJOR) -DNCCL_MINOR=$(NCCL_MINOR) -DNCCL_PATCH=$(NCCL_PATCH)
++#NCCL_MAJOR   := 1
++#NCCL_MINOR   := 3
++#NCCL_PATCH   := 5
++#CXXFLAGS  += -DNCCL_MAJOR=$(NCCL_MAJOR) -DNCCL_MINOR=$(NCCL_MINOR) -DNCCL_PATCH=$(NCCL_PATCH)
+ 
+ CUDA_VERSION ?= $(shell ls $(CUDA_LIB)/libcudart.so.* | head -1 | rev | cut -d "." -f -2 | rev)
+ CUDA_MAJOR = $(shell echo $(CUDA_VERSION) | cut -d "." -f 1)
+@@ -66,7 +66,7 @@
+ .DEFAULT : all
+ 
+ INCEXPORTS  := nccl.h
+-LIBSRCFILES := libwrap.cu core.cu all_gather.cu all_reduce.cu broadcast.cu reduce.cu reduce_scatter.cu
++LIBSRCFILES := 
+ LIBNAME     := libnccl.so
+ STATICLIBNAME := libnccl_static.a
+ 
+@@ -82,30 +82,15 @@
+ LIBOBJ     := $(patsubst %.cu, $(OBJDIR)/%.o, $(filter %.cu, $(LIBSRCFILES)))
+ DEPFILES   := $(patsubst %.o, %.d, $(LIBOBJ)) $(patsubst %, %.d, $(TESTBINS)) $(patsubst %, %.d, $(MPITESTBINS))
+ 
+-all : lib staticlib
+-
+-lib : $(INCTARGETS) $(LIBDIR)/$(LIBTARGET)
+-
+-staticlib : $(INCTARGETS) $(LIBDIR)/$(STATICLIBTARGET)
++all : test
+ 
+ -include $(DEPFILES)
+ 
+ $(LIBDIR)/$(LIBTARGET) : $(LIBOBJ)
+-	@printf "Linking   %-35s > %s\n" $(LIBTARGET) $@
+-	mkdir -p $(LIBDIR)
+-	$(CXX) $(CXXFLAGS) -shared -Wl,--no-as-needed -Wl,-soname,$(LIBSONAME) -o $@ $(LDFLAGS) $(LIBOBJ)
+-	ln -sf $(LIBSONAME) $(LIBDIR)/$(LIBNAME)
+-	ln -sf $(LIBTARGET) $(LIBDIR)/$(LIBSONAME)
+ 
+ $(LIBDIR)/$(STATICLIBTARGET) : $(LIBOBJ)
+-	@printf "Archiving %-35s > %s\n" $(STATICLIBTARGET) $@
+-	mkdir -p $(LIBDIR)
+-	ar cr $@ $(LIBOBJ)
+ 
+ $(INCDIR)/%.h : src/%.h
+-	@printf "Grabbing  %-35s > %s\n" $< $@
+-	mkdir -p $(INCDIR)
+-	cp -f $< $@
+ 
+ $(OBJDIR)/%.o : src/%.cu
+ 	@printf "Compiling %-35s > %s\n" $< $@
+@@ -118,7 +103,7 @@
+ 	@rm -f $(@:%.o=%.d.tmp)
+ 
+ clean :
+-	rm -rf $(BUILDDIR)
++	rm -rf $(BUILDDIR)/test
+ 
+ install : lib
+ 	mkdir -p $(PREFIX)/lib
+@@ -182,55 +167,3 @@
+                 sed -e 's/^ *//' -e 's/$$/:/' >> $(@:%=%.d)
+ 	@rm -f $(@:%=%.d.tmp)
+ 
+-#### PACKAGING ####
+-
+-DEBIANDIR  := $(BUILDDIR)/debian
+-
+-DEBGEN_IN  := $(shell (cd debian ; ls *.in))
+-DEBGEN     := $(DEBGEN_IN:.in=)
+-DEBFILES   := compat copyright libnccl-dev.install libnccl-dev.manpages nccl.7 rules $(DEBGEN)
+-DEBTARGETS := $(patsubst %, $(DEBIANDIR)/%, $(DEBFILES))
+-
+-DEB_REVISION   ?= 1
+-DEB_TIMESTAMP  := $(shell date -R)
+-DEB_ARCH       ?= amd64
+-
+-debian : $(DEBTARGETS)
+-
+-deb : lib debian
+-	@printf "Building Debian package\n"
+-	(cd $(BUILDDIR); debuild -eLD_LIBRARY_PATH -uc -us -d -b)
+-	mkdir -p $(BUILDDIR)/deb/
+-	mv $(BUILDDIR)/../libnccl*.deb $(BUILDDIR)/deb/
+-
+-debclean :
+-	rm -Rf $(DEBIANDIR)
+-
+-$(DEBIANDIR)/% : debian/%.in
+-	@printf "Generating %-35s > %s\n" $< $@
+-	sed -e "s/\$${nccl:Major}/$(NCCL_MAJOR)/g" \
+-	    -e "s/\$${nccl:Minor}/$(NCCL_MINOR)/g" \
+-	    -e "s/\$${nccl:Patch}/$(NCCL_PATCH)/g" \
+-	    -e "s/\$${cuda:Major}/$(CUDA_MAJOR)/g" \
+-	    -e "s/\$${cuda:Minor}/$(CUDA_MINOR)/g" \
+-	    -e "s/\$${deb:Revision}/$(DEB_REVISION)/g" \
+-	    -e "s/\$${deb:Timestamp}/$(DEB_TIMESTAMP)/g" \
+-	    -e "s/\$${deb:Arch}/$(DEB_ARCH)/g" \
+-	    $< > $@
+-
+-$(DEBIANDIR)/% : debian/%
+-	@printf "Grabbing  %-35s > %s\n" $< $@
+-	mkdir -p $(DEBIANDIR)
+-	cp -f $< $@
+-
+-#### FORTRAN BINDINGS ####
+-
+-export NCCL_MAJOR NCCL_MINOR NCCL_PATCH CUDA_MAJOR CUDA_MINOR LIBLINK CUDA_LIB BUILDDIR
+-
+-forlib : lib
+-	$(MAKE) -C fortran lib
+-fortest : forlib
+-	$(MAKE) -C fortran test
+-forclean :
+-	$(MAKE) -C fortran clean
+-
