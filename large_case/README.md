@@ -11,6 +11,11 @@ A.java:3: error: code too large
       public int t(int k, int v){
                  ^
 1 error
-miyo@sagardo:%
+miyo@sagardo:% java -version
+java version "1.8.0_181"
+Java(TM) SE Runtime Environment (build 1.8.0_181-b13)
+Java HotSpot(TM) 64-Bit Server VM (build 25.181-b13, mixed mode)
+miyo@sagardo:% javac -version
+javac 1.8.0_181
 ```
 
