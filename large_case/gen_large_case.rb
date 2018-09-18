@@ -1,4 +1,5 @@
-NUM=2**13
+@num = 2**8
+@num = ARGV[0].to_i if ARGV.size > 0
 MAX=2**31-1
 
 def gen_switch(i)
@@ -12,7 +13,7 @@ class B{
         int ret = 0;
         switch(k){
 EOF
-NUM.times{ |i| puts gen_switch(i) }
+@num.times{ |i| puts gen_switch(i) }
 puts <<EOF
           default: ret = 0;
         }
