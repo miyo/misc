@@ -12,7 +12,12 @@ public class SampleTaskListener implements TaskListener {
     }
 
     @Override
-    public void started(TaskEvent e) {}
+    public void started(TaskEvent e) {
+		if (e.getKind() == TaskEvent.Kind.GENERATE){
+            System.out.println("Task event " + e + " has started");
+			e.getCompilationUnit().accept(new MyScanner(), null);
+        }
+	}
 
     @Override
     public void finished(TaskEvent e) {
@@ -22,9 +27,11 @@ public class SampleTaskListener implements TaskListener {
 		}
         if (e.getKind() == TaskEvent.Kind.ENTER){
             System.out.println("Task event " + e + " has ended");
+			e.getCompilationUnit().accept(new MyScanner(), null);
 		}
         if (e.getKind() == TaskEvent.Kind.ANALYZE){
             System.out.println("Task event " + e + " has ended");
+			e.getCompilationUnit().accept(new MyScanner(), null);
         }
         if (e.getKind() == TaskEvent.Kind.GENERATE){
             System.out.println("Task event " + e + " has ended");
